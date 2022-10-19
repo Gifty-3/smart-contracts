@@ -1,6 +1,6 @@
 #![cfg(test)]
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-use cosmwasm_std::{from_binary, to_binary, CosmosMsg, DepsMut, Empty, Response, WasmMsg};
+use cosmwasm_std::{from_binary, to_binary, CosmosMsg, DepsMut, Empty, Response, WasmMsg, Uint128, coins};
 
 use cw721::{
     Approval, ApprovalResponse, ContractInfoResponse, Cw721Query, Cw721ReceiveMsg, Expiration,
@@ -21,6 +21,7 @@ fn setup_contract(deps: DepsMut<'_>) -> Cw721Contract<'static, Extension, Empty,
         name: CONTRACT_NAME.to_string(),
         symbol: SYMBOL.to_string(),
         minter: String::from(MINTER),
+        price: Uint128::from(2000000u128)
     };
     let info = mock_info("creator", &[]);
     let res = contract.instantiate(deps, mock_env(), info, msg).unwrap();
@@ -37,6 +38,8 @@ fn proper_instantiation() {
         name: CONTRACT_NAME.to_string(),
         symbol: SYMBOL.to_string(),
         minter: String::from(MINTER),
+        price: Uint128::from(2000000u128)
+
     };
     let info = mock_info("creator", &[]);
 
@@ -55,6 +58,8 @@ fn proper_instantiation() {
         ContractInfoResponse {
             name: CONTRACT_NAME.to_string(),
             symbol: SYMBOL.to_string(),
+            price: Uint128::from(2000000u128)
+
         }
     );
 
@@ -79,6 +84,7 @@ fn minting() {
         owner: String::from("medusa"),
         token_uri: Some(token_uri.clone()),
         extension: None,
+        lockup_time: Uint128::from(100000000u128)
     });
 
     // random cannot mint
@@ -89,9 +95,9 @@ fn minting() {
     assert_eq!(err, ContractError::Unauthorized {});
 
     // minter can mint
-    let allowed = mock_info(MINTER, &[]);
+    let allowed = mock_info(MINTER, & coins(2000000, "uusdcx".to_string()));
     let _ = contract
-        .execute(deps.as_mut(), mock_env(), allowed, mint_msg)
+        .execute(deps.as_mut(), mock_env(), allowed.clone(), mint_msg)
         .unwrap();
 
     // ensure num tokens increases
@@ -131,9 +137,10 @@ fn minting() {
         owner: String::from("hercules"),
         token_uri: None,
         extension: None,
+        lockup_time: Uint128::from(100000000u128)
+
     });
 
-    let allowed = mock_info(MINTER, &[]);
     let err = contract
         .execute(deps.as_mut(), mock_env(), allowed, mint_msg2)
         .unwrap_err();
@@ -158,6 +165,8 @@ fn burning() {
         owner: MINTER.to_string(),
         token_uri: Some(token_uri),
         extension: None,
+        lockup_time: Uint128::from(100000000u128)
+
     });
 
     let burn_msg = ExecuteMsg::Burn { token_id };
@@ -208,6 +217,8 @@ fn transferring_nft() {
         owner: String::from("venus"),
         token_uri: Some(token_uri),
         extension: None,
+        lockup_time: Uint128::from(100000000u128)
+
     });
 
     let minter = mock_info(MINTER, &[]);
@@ -262,6 +273,8 @@ fn sending_nft() {
         owner: String::from("venus"),
         token_uri: Some(token_uri),
         extension: None,
+        lockup_time: Uint128::from(100000000u128)
+
     });
 
     let minter = mock_info(MINTER, &[]);
@@ -328,6 +341,8 @@ fn approving_revoking() {
         owner: String::from("demeter"),
         token_uri: Some(token_uri),
         extension: None,
+        lockup_time: Uint128::from(100000000u128)
+
     });
 
     let minter = mock_info(MINTER, &[]);
@@ -475,6 +490,8 @@ fn approving_all_revoking_all() {
         owner: String::from("demeter"),
         token_uri: Some(token_uri1),
         extension: None,
+        lockup_time: Uint128::from(100000000u128)
+
     });
 
     let minter = mock_info(MINTER, &[]);
@@ -487,6 +504,8 @@ fn approving_all_revoking_all() {
         owner: String::from("demeter"),
         token_uri: Some(token_uri2),
         extension: None,
+        lockup_time: Uint128::from(100000000u128)
+
     });
 
     contract
@@ -691,6 +710,8 @@ fn query_tokens_by_owner() {
         owner: demeter.clone(),
         token_uri: None,
         extension: None,
+        lockup_time: Uint128::from(100000000u128)
+
     });
     contract
         .execute(deps.as_mut(), mock_env(), minter.clone(), mint_msg)
@@ -701,6 +722,8 @@ fn query_tokens_by_owner() {
         owner: ceres.clone(),
         token_uri: None,
         extension: None,
+        lockup_time: Uint128::from(100000000u128)
+
     });
     contract
         .execute(deps.as_mut(), mock_env(), minter.clone(), mint_msg)
@@ -711,6 +734,8 @@ fn query_tokens_by_owner() {
         owner: demeter.clone(),
         token_uri: None,
         extension: None,
+        lockup_time: Uint128::from(100000000u128)
+
     });
     contract
         .execute(deps.as_mut(), mock_env(), minter, mint_msg)

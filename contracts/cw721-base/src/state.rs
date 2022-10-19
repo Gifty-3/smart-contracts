@@ -3,7 +3,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
-use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage};
+use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage, Uint128};
 
 use cw721::{ContractInfoResponse, CustomMsg, Cw721, Expiration};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
@@ -104,13 +104,24 @@ where
 pub struct TokenInfo<T> {
     /// The owner of the newly minted NFT
     pub owner: Addr,
+    pub sender: Addr,
     /// Approvals are stored here, as we clear them all upon transfer and cannot accumulate much
     pub approvals: Vec<Approval>,
-
+    /// Amount of native tokens sent to an address
+    pub amount_sent: Uint128,
+    /// Fungible token address from where tokens were sent
+    pub fungible_token_address: Option<String>,
+    /// Fungible token amount sent to gift card
+    pub fungible_token_amount: Option<Uint128>,
+    /// Non fungible token address from where token was sent
+    pub non_fungible_token_address: Option<String>,
+    pub token_id: Option<String>,
     /// Universal resource identifier for this NFT
     /// Should point to a JSON file that conforms to the ERC721
     /// Metadata JSON Schema
     pub token_uri: Option<String>,
+    /// Time to which the tokens and native tokens will be locked up in the smart contract
+    pub lockup_time: Uint128,
 
     /// You can add any custom metadata here when you extend cw721-base
     pub extension: T,

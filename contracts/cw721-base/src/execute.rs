@@ -1,17 +1,17 @@
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, CosmosMsg, BankMsg, coins, Empty, WasmMsg, to_binary, from_binary};
 
 use cw2::set_contract_version;
 use cw721::{ContractInfoResponse, CustomMsg, Cw721Execute, Cw721ReceiveMsg, Expiration};
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg, Cw20ExecuteMsg, Cw20ReceiveMsg, CW20HookMsg, Cw721ExecuteMsg};
 use crate::state::{Approval, Cw721Contract, TokenInfo};
 
 // Version info for migration
-const CONTRACT_NAME: &str = "crates.io:cw721-base";
+const CONTRACT_NAME: &str = "crates.io:cw721-gift";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 impl<'a, T, C, E, Q> Cw721Contract<'a, T, C, E, Q>
@@ -33,6 +33,7 @@ where
         let info = ContractInfoResponse {
             name: msg.name,
             symbol: msg.symbol,
+            price: msg.price
         };
         self.contract_info.save(deps.storage, &info)?;
         let minter = deps.api.addr_validate(&msg.minter)?;
@@ -71,6 +72,8 @@ where
                 msg,
             } => self.send_nft(deps, env, info, contract, token_id, msg),
             ExecuteMsg::Burn { token_id } => self.burn(deps, env, info, token_id),
+            ExecuteMsg::Claim { token_id } => self.claim(deps, env, info, token_id),
+            ExecuteMsg::Receive(msg) => self.execute_receive_cw20(deps, env, info, msg),
             ExecuteMsg::Extension { msg: _ } => Ok(Response::default()),
         }
     }
@@ -83,7 +86,10 @@ where
     C: CustomMsg,
     E: CustomMsg,
     Q: CustomMsg,
-{
+{   
+    /// Creation of the gift card.  
+    /// If 2.5 USDC is supplied to the contract then the user is allowed to mint a gift card
+    /// The rest of the native tokens are added to the gift card to be claimed by the user
     pub fn mint(
         &self,
         deps: DepsMut,
@@ -91,19 +97,30 @@ where
         info: MessageInfo,
         msg: MintMsg<T>,
     ) -> Result<Response<C>, ContractError> {
+        let state = self.contract_info.load(deps.storage)?;
         let minter = self.minter.load(deps.storage)?;
-
-        if info.sender != minter {
-            return Err(ContractError::Unauthorized {});
+        // Check if funds are enough
+        if info.funds[0].denom != "uusdcx" || info.funds[0].amount <= state.price {
+            return Err(ContractError::Unauthorized {  })
         }
-
+        
+        // Check native tokens sent with the function to add as gift
+        let amount = info.funds[0].amount.checked_sub(state.price).unwrap();
         // create the token
         let token = TokenInfo {
             owner: deps.api.addr_validate(&msg.owner)?,
+            sender: deps.api.addr_validate(&info.sender.to_string())?,
             approvals: vec![],
             token_uri: msg.token_uri,
             extension: msg.extension,
+            amount_sent: amount,
+            fungible_token_address: None,
+            fungible_token_amount: None,
+            non_fungible_token_address: None,
+            token_id: None,
+            lockup_time: msg.lockup_time
         };
+
         self.tokens
             .update(deps.storage, &msg.token_id, |old| match old {
                 Some(_) => Err(ContractError::Claimed {}),
@@ -114,10 +131,184 @@ where
 
         Ok(Response::new()
             .add_attribute("action", "mint")
-            .add_attribute("minter", info.sender)
+            .add_attribute("minter", info.sender.clone())
             .add_attribute("owner", msg.owner)
-            .add_attribute("token_id", msg.token_id))
+            .add_attribute("token_id", msg.token_id)
+        .add_message(CosmosMsg::Bank(BankMsg::Send { to_address: minter.to_string(), amount: coins(u128::from(state.price), "uusdcx".to_string()) })))
     }
+
+    pub fn claim(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        token_id: String,
+    ) -> Result<Response<C>, ContractError> {
+        let token = self.tokens.load(deps.storage, &token_id)?;
+        self.check_can_send(deps.as_ref(), &env, &info, &token)?;
+        if Uint128::from(env.block.time.seconds()) < token.lockup_time {
+            return Err(ContractError::Unauthorized {  })
+        }
+        let amount_to_send = token.amount_sent;
+        self.tokens.remove(deps.storage, &token_id)?;
+        self.decrement_tokens(deps.storage)?;
+        let mut resp: Vec<CosmosMsg<C>> = vec![];
+        if amount_to_send > Uint128::zero() {
+            resp.push(CosmosMsg::Bank(BankMsg::Send { to_address: info.sender.to_string(), amount: coins(u128::from(amount_to_send), "uusdcx".to_string()) }));
+        }
+
+        let fungible_exists = match token.fungible_token_address.clone() {
+            Some(_string) => true,
+            None => false,
+        };
+        if fungible_exists {
+            resp.push(CosmosMsg::Wasm(WasmMsg::Execute { contract_addr: token.fungible_token_address.unwrap(), msg: to_binary(&Cw20ExecuteMsg::Transfer { recipient: info.sender.to_string(), amount: token.fungible_token_amount.unwrap() })?, funds: vec![] }));
+        }
+
+        let non_fungible_exists = match token.non_fungible_token_address.clone() {
+            Some(_string) => true,
+            None => false,
+        };
+        if non_fungible_exists {
+            resp.push(CosmosMsg::Wasm(WasmMsg::Execute { contract_addr: token.non_fungible_token_address.unwrap(), msg: to_binary(&Cw721ExecuteMsg::TransferNft { recipient: info.sender.to_string(), token_id: token.token_id.unwrap() })?, funds: vec![] }));
+        }
+        Ok(Response::new()
+            .add_attribute("action", "claim")
+            .add_messages(resp)
+            )
+    }
+
+    fn private_mint(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        msg: MintMsg<T>,
+        fungible_token_address: String,
+        fungible_token_amount: Uint128
+    ) -> Result<Response<C>, ContractError> {
+        let state = self.contract_info.load(deps.storage)?;
+        let minter = self.minter.load(deps.storage)?;
+        // Check if funds are enough
+        if info.funds[0].denom != "uusdcx" || info.funds[0].amount <= state.price {
+            return Err(ContractError::Unauthorized {  })
+        }
+        
+        // Check native tokens sent with the function to add as gift
+        let amount = info.funds[0].amount.checked_sub(state.price).unwrap();
+        // create the token
+        let token = TokenInfo {
+            owner: deps.api.addr_validate(&msg.owner)?,
+            sender: deps.api.addr_validate(&info.sender.to_string())?,
+            approvals: vec![],
+            token_uri: msg.token_uri,
+            extension: msg.extension,
+            amount_sent: amount,
+            fungible_token_address: Some(fungible_token_address),
+            fungible_token_amount: Some(fungible_token_amount),
+            non_fungible_token_address: None,
+            token_id: None,
+            lockup_time: msg.lockup_time,
+        };
+
+        self.tokens
+            .update(deps.storage, &msg.token_id, |old| match old {
+                Some(_) => Err(ContractError::Claimed {}),
+                None => Ok(token),
+            })?;
+
+        self.increment_tokens(deps.storage)?;
+
+        Ok(Response::new()
+            .add_attribute("action", "mint")
+            .add_attribute("minter", info.sender.clone())
+            .add_attribute("owner", msg.owner)
+            .add_attribute("token_id", msg.token_id)
+        .add_message(CosmosMsg::Bank(BankMsg::Send { to_address: minter.to_string(), amount: coins(u128::from(state.price), "uusdcx".to_string()) })))
+    }
+
+    fn private_mint_nft(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        msg: MintMsg<T>,
+        non_fungible_token_address: String,
+        token_id: String,
+    ) -> Result<Response<C>, ContractError> {
+        let state = self.contract_info.load(deps.storage)?;
+        let minter = self.minter.load(deps.storage)?;
+        // Check if funds are enough
+        if info.funds[0].denom != "uusdcx" || info.funds[0].amount <= state.price {
+            return Err(ContractError::Unauthorized {  })
+        }
+        
+        // Check native tokens sent with the function to add as gift
+        let amount = info.funds[0].amount.checked_sub(state.price).unwrap();
+        // create the token
+        let token = TokenInfo {
+            owner: deps.api.addr_validate(&msg.owner)?,
+            sender: deps.api.addr_validate(&info.sender.to_string())?,
+            approvals: vec![],
+            token_uri: msg.token_uri,
+            extension: msg.extension,
+            amount_sent: amount,
+            fungible_token_address: None,
+            fungible_token_amount: None,
+            non_fungible_token_address: Some(non_fungible_token_address),
+            token_id: Some(token_id),
+            lockup_time: msg.lockup_time
+        };
+
+        self.tokens
+            .update(deps.storage, &msg.token_id, |old| match old {
+                Some(_) => Err(ContractError::Claimed {}),
+                None => Ok(token),
+            })?;
+
+        self.increment_tokens(deps.storage)?;
+
+        Ok(Response::new()
+            .add_attribute("action", "mint")
+            .add_attribute("minter", info.sender.clone())
+            .add_attribute("owner", msg.owner)
+            .add_attribute("token_id", msg.token_id)
+        .add_message(CosmosMsg::Bank(BankMsg::Send { to_address: minter.to_string(), amount: coins(u128::from(state.price), "uusdcx".to_string()) })))
+    }
+
+    pub fn execute_receive_cw20(
+        &self,
+        deps: DepsMut, 
+        env: Env,
+        info: MessageInfo,
+        msg: Cw20ReceiveMsg,
+    
+    ) -> Result<Response<C>, ContractError>  {
+    
+        match from_binary(&msg.msg)? {
+            CW20HookMsg::CreateGift { mint_paramters } => {
+                self.private_mint(deps,env,info.clone(),mint_paramters, info.sender.to_string(), msg.amount)
+            }
+        }
+    }
+
+    pub fn execute_receive_cw721(
+        &self,
+        deps: DepsMut, 
+        env: Env,
+        info: MessageInfo,
+        msg: Cw721ReceiveMsg,
+    
+    ) -> Result<Response<C>, ContractError>  {
+    
+        match from_binary(&msg.msg)? {
+            CW20HookMsg::CreateGift { mint_paramters } => {
+                self.private_mint_nft(deps,env,info.clone(),mint_paramters, info.sender.to_string(),  msg.token_id)
+            }
+        }
+    }
+
+
 }
 
 impl<'a, T, C, E, Q> Cw721Execute<T, C> for Cw721Contract<'a, T, C, E, Q>
@@ -268,6 +459,8 @@ where
             .add_attribute("sender", info.sender)
             .add_attribute("token_id", token_id))
     }
+
+    
 }
 
 // helpers

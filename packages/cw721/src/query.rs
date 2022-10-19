@@ -1,4 +1,5 @@
 use cosmwasm_schema::cw_serde;
+use cosmwasm_std::Uint128;
 use cw_utils::Expiration;
 
 #[cw_serde]
@@ -108,6 +109,7 @@ pub struct NumTokensResponse {
 pub struct ContractInfoResponse {
     pub name: String,
     pub symbol: String,
+    pub price: Uint128,
 }
 
 #[cw_serde]
