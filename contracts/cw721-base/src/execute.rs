@@ -172,6 +172,8 @@ where
         if non_fungible_exists {
             resp.push(CosmosMsg::Wasm(WasmMsg::Execute { contract_addr: token.non_fungible_token_address.unwrap(), msg: to_binary(&Cw721ExecuteMsg::TransferNft { recipient: info.sender.to_string(), token_id: token.token_id.unwrap() })?, funds: vec![] }));
         }
+
+        
         Ok(Response::new()
             .add_attribute("action", "claim")
             .add_messages(resp)
