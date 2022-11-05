@@ -124,7 +124,8 @@ pub struct NftInfoResponse<T> {
     pub cw20_amount: Option<Uint128>,
     pub cw721_address: Option<String>,
     pub cw721_amount: Option<String>,
-    pub amount: Uint128
+    pub amount: Uint128,
+    pub sender: String
 }
 
 #[cw_serde]

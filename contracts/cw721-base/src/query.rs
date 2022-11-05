@@ -42,7 +42,8 @@ where
             cw721_address: info.non_fungible_token_address,
             cw20_amount: info.fungible_token_amount,
             cw721_amount: info.token_id,
-            amount: info.amount_sent
+            amount: info.amount_sent,
+            sender: info.sender.to_string()
         })
     }
 
@@ -211,7 +212,8 @@ where
                 cw721_address: info.non_fungible_token_address,
                 cw20_amount: info.fungible_token_amount,
                 cw721_amount: info.token_id,
-                amount: info.amount_sent
+                amount: info.amount_sent,
+                sender: info.sender.to_string()
 
             },
         })
