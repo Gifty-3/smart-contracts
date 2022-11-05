@@ -120,6 +120,11 @@ pub struct NftInfoResponse<T> {
     pub token_uri: Option<String>,
     /// You can add any custom metadata here when you extend cw721-base
     pub extension: T,
+    pub cw20_address: Option<String>,
+    pub cw20_amount: Option<Uint128>,
+    pub cw721_address: Option<String>,
+    pub cw721_amount: Option<String>,
+    pub amount: Uint128
 }
 
 #[cw_serde]

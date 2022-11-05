@@ -38,6 +38,11 @@ where
         Ok(NftInfoResponse {
             token_uri: info.token_uri,
             extension: info.extension,
+            cw20_address: info.fungible_token_address,
+            cw721_address: info.non_fungible_token_address,
+            cw20_amount: info.fungible_token_amount,
+            cw721_amount: info.token_id,
+            amount: info.amount_sent
         })
     }
 
@@ -202,6 +207,12 @@ where
             info: NftInfoResponse {
                 token_uri: info.token_uri,
                 extension: info.extension,
+                cw20_address: info.fungible_token_address,
+                cw721_address: info.non_fungible_token_address,
+                cw20_amount: info.fungible_token_amount,
+                cw721_amount: info.token_id,
+                amount: info.amount_sent
+
             },
         })
     }
