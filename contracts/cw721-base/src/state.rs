@@ -122,7 +122,7 @@ pub struct TokenInfo<T> {
     pub token_uri: Option<String>,
     /// Time to which the tokens and native tokens will be locked up in the smart contract
     pub lockup_time: Uint128,
-
+    pub message: String,
     /// You can add any custom metadata here when you extend cw721-base
     pub extension: T,
 }

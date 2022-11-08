@@ -118,7 +118,8 @@ where
             fungible_token_amount: None,
             non_fungible_token_address: None,
             token_id: None,
-            lockup_time: msg.lockup_time
+            lockup_time: msg.lockup_time,
+            message: msg.message
         };
 
         self.tokens
@@ -211,6 +212,7 @@ where
             non_fungible_token_address: None,
             token_id: None,
             lockup_time: msg.lockup_time,
+            message: msg.message
         };
 
         self.tokens
@@ -259,7 +261,8 @@ where
             fungible_token_amount: None,
             non_fungible_token_address: Some(non_fungible_token_address),
             token_id: Some(token_id),
-            lockup_time: msg.lockup_time
+            lockup_time: msg.lockup_time,
+            message: msg.message
         };
 
         self.tokens

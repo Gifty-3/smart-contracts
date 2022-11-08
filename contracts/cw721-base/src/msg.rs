@@ -108,6 +108,7 @@ pub struct MintMsg<T> {
     /// Should point to a JSON file that conforms to the ERC721
     /// Metadata JSON Schema
     pub token_uri: Option<String>,
+    pub message: String,
     /// Any custom extension used by this contract
     pub extension: T,
 }
