@@ -275,6 +275,7 @@ where
                 limit,
             )?),
             QueryMsg::NumTokens {} => to_binary(&self.num_tokens(deps)?),
+            QueryMsg::NumCreated {} => to_binary(&self.num_created(deps)?),
             QueryMsg::Tokens {
                 owner,
                 start_after,

@@ -147,6 +147,9 @@ pub enum QueryMsg<Q> {
     /// Total number of tokens issued
     NumTokens {},
 
+    /// Total numbers of tokens created
+    NumCreated {},
+
     /// With MetaData Extension.
     /// Returns top-level metadata about the contract: `ContractInfoResponse`
     ContractInfo {},
