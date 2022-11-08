@@ -129,7 +129,7 @@ where
             })?;
 
         self.increment_tokens(deps.storage)?;
-
+        self.increment_total(deps.storage)?;
         Ok(Response::new()
             .add_attribute("action", "mint")
             .add_attribute("minter", info.sender.clone())
@@ -222,7 +222,7 @@ where
             })?;
 
         self.increment_tokens(deps.storage)?;
-
+        self.increment_total(deps.storage)?;
         Ok(Response::new()
             .add_attribute("action", "mint")
             .add_attribute("minter", info.sender.clone())
@@ -272,7 +272,7 @@ where
             })?;
 
         self.increment_tokens(deps.storage)?;
-
+        self.increment_total(deps.storage)?;
         Ok(Response::new()
             .add_attribute("action", "mint")
             .add_attribute("minter", info.sender.clone())

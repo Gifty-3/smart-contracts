@@ -6,7 +6,7 @@ use cosmwasm_std::{to_binary, Addr, Binary, BlockInfo, Deps, Env, Order, StdErro
 use cw721::{
     AllNftInfoResponse, ApprovalResponse, ApprovalsResponse, ContractInfoResponse, CustomMsg,
     Cw721Query, Expiration, NftInfoResponse, NumTokensResponse, OperatorsResponse, OwnerOfResponse,
-    TokensResponse,
+    TokensResponse, NumCreatedResponse
 };
 use cw_storage_plus::Bound;
 use cw_utils::maybe_addr;
@@ -31,6 +31,11 @@ where
     fn num_tokens(&self, deps: Deps) -> StdResult<NumTokensResponse> {
         let count = self.token_count(deps.storage)?;
         Ok(NumTokensResponse { count })
+    }
+
+    fn num_created(&self, deps: Deps) -> StdResult<NumCreatedResponse> {
+        let count = self.total_created(deps.storage)?;
+        Ok(NumCreatedResponse { count })
     }
 
     fn nft_info(&self, deps: Deps, token_id: String) -> StdResult<NftInfoResponse<T>> {

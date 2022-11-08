@@ -106,6 +106,11 @@ pub struct NumTokensResponse {
 }
 
 #[cw_serde]
+pub struct NumCreatedResponse {
+    pub count: u64,
+}
+
+#[cw_serde]
 pub struct ContractInfoResponse {
     pub name: String,
     pub symbol: String,

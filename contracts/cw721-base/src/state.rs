@@ -17,6 +17,7 @@ where
     pub contract_info: Item<'a, ContractInfoResponse>,
     pub minter: Item<'a, Addr>,
     pub token_count: Item<'a, u64>,
+    pub total_created: Item<'a, u64>,
     /// Stored as (granter, operator) giving operator full control over granter's account
     pub operators: Map<'a, (&'a Addr, &'a Addr), Expiration>,
     pub tokens: IndexedMap<'a, &'a str, TokenInfo<T>, TokenIndexes<'a, T>>,
@@ -50,6 +51,7 @@ where
             "operators",
             "tokens",
             "tokens__owner",
+            "total_created"
         )
     }
 }
@@ -67,6 +69,7 @@ where
         operator_key: &'a str,
         tokens_key: &'a str,
         tokens_owner_key: &'a str,
+        created_key: &'a str
     ) -> Self {
         let indexes = TokenIndexes {
             owner: MultiIndex::new(token_owner_idx, tokens_key, tokens_owner_key),
@@ -76,6 +79,7 @@ where
             minter: Item::new(minter_key),
             token_count: Item::new(token_count_key),
             operators: Map::new(operator_key),
+            total_created: Item::new(created_key),
             tokens: IndexedMap::new(tokens_key, indexes),
             _custom_response: PhantomData,
             _custom_execute: PhantomData,
@@ -87,9 +91,19 @@ where
         Ok(self.token_count.may_load(storage)?.unwrap_or_default())
     }
 
+    pub fn total_created(&self, storage: &dyn Storage) -> StdResult<u64> {
+        Ok(self.total_created.may_load(storage)?.unwrap_or_default())
+    }
+
     pub fn increment_tokens(&self, storage: &mut dyn Storage) -> StdResult<u64> {
         let val = self.token_count(storage)? + 1;
         self.token_count.save(storage, &val)?;
+        Ok(val)
+    }
+
+    pub fn increment_total(&self, storage: &mut dyn Storage) -> StdResult<u64> {
+        let val = self.total_created(storage)? + 1;
+        self.total_created.save(storage, &val)?;
         Ok(val)
     }
 
